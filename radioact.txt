@@ -1,4 +1,4 @@
-Time counts/s
+x	y
 0	120
 1	101
 2	85

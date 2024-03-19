@@ -1,7 +1,8 @@
 This repository contains all the Python scripts from the book:
 
 Mathematical Methods using Python: Applications in Physics and Engineering 1st Edition
-by Vasilis Pagonis (Author), Christopher Wayne Kulp (Author)
+
+by Vasilis Pagonis and  Christopher Wayne Kulp 
 
 CRC Press, 2024
 

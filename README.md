@@ -8,7 +8,8 @@ This repository contains all the Python scripts from the book:
 
 **This book will be released on May 14, 2024**
 
-_Book website at Amazon: _ https://www.amazon.com/Mathematical-Methods-using-Python-Applications/dp/1032278366
+_Book website at Amazon:_ 
+https://www.amazon.com/Mathematical-Methods-using-Python-Applications/dp/1032278366
 
 ABOUT THIS BOOK
 This advanced undergraduate textbook presents a new approach to teaching mathematical methods for scientists and engineers. It provides a practical, pedagogical introduction to utilizing Python in Mathematical and Computational Methods courses. Both analytical and computational examples are integrated from its start. Each chapter concludes with a set of problems designed to help students hone their skills in mathematical techniques, computer programming, and numerical analysis. The book places less emphasis on mathematical proofs, and more emphasis on how to use computers for both symbolic and numerical calculations. It contains 182 extensively documented coding examples, based on topics that students will encounter in their advanced courses in Mechanics, Electronics, Optics, Electromagnetism, Quantum Mechanics etc.

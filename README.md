@@ -11,6 +11,8 @@ This repository contains all the Python scripts from the book:
 _Book website at Amazon:_ 
 https://www.amazon.com/Mathematical-Methods-using-Python-Applications/dp/1032278366
 
+__________________________________
+
 **ABOUT THIS BOOK**
 
 This advanced undergraduate textbook presents a new approach to teaching mathematical methods for scientists and engineers. It provides a practical, pedagogical introduction to utilizing Python in Mathematical and Computational Methods courses. Both analytical and computational examples are integrated from its start. Each chapter concludes with a set of problems designed to help students hone their skills in mathematical techniques, computer programming, and numerical analysis. The book places less emphasis on mathematical proofs, and more emphasis on how to use computers for both symbolic and numerical calculations. It contains 182 extensively documented coding examples, based on topics that students will encounter in their advanced courses in Mechanics, Electronics, Optics, Electromagnetism, Quantum Mechanics etc.
@@ -30,11 +32,12 @@ An introductory chapter gives students a crash course in Python programming and 
 **_Christopher W. Kulp_** is the John P. Graham Teaching Professor of Physics at Lycoming College. He has been teaching undergraduate physics at all levels for 20 years. Dr. Kulp’s research focuses on modelling complex systems, time series analysis, and machine learning. He has published 30 peer-reviewed papers in international journals, many of which include student co-authors. He is also co-author of the undergraduate textbook “Classical Mechanics: a computational approach, with examples in Python and Mathematica” (CRC Press, 2020).
 
 **TO OUR READERS**
+
 We have kept the number of required external Python packages intentionally at a minimum, so that newcomers to Python can follow the codes easily.
 
 All figures in this book were produced using the scripts in this repository, so that users know immediately what to expect when they run the scripts.
 
-Experienced programmers will quickly find out that they can improve the codes given here, and it is of course possible to make the codes more compact 
+Experienced programmers will  find out that they can improve the codes given here, and it is of course possible to make the codes more compact 
 and elegant. However, we chose to provide codes which are simple and clear, and which can be easily modified for the purposes of the reader, 
 rather than attempting to create compact codes which may be difficult to follow and modify.
 

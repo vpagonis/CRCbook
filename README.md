@@ -11,7 +11,8 @@ This repository contains all the Python scripts from the book:
 _Book website at Amazon:_ 
 https://www.amazon.com/Mathematical-Methods-using-Python-Applications/dp/1032278366
 
-ABOUT THIS BOOK
+**ABOUT THIS BOOK**
+
 This advanced undergraduate textbook presents a new approach to teaching mathematical methods for scientists and engineers. It provides a practical, pedagogical introduction to utilizing Python in Mathematical and Computational Methods courses. Both analytical and computational examples are integrated from its start. Each chapter concludes with a set of problems designed to help students hone their skills in mathematical techniques, computer programming, and numerical analysis. The book places less emphasis on mathematical proofs, and more emphasis on how to use computers for both symbolic and numerical calculations. It contains 182 extensively documented coding examples, based on topics that students will encounter in their advanced courses in Mechanics, Electronics, Optics, Electromagnetism, Quantum Mechanics etc.
 
 An introductory chapter gives students a crash course in Python programming and the most often used libraries (SymPy, NumPy, SciPy, Matplotlib). This is followed by chapters dedicated to differentiation, integration, vectors and multiple integration techniques. The next group of chapters covers complex numbers, matrices, vector analysis and vector spaces. Extensive chapters cover ordinary and partial differential equations, followed by chapters on nonlinear systems and on the analysis of experimental data using linear and nonlinear regression techniques, Fourier transforms, binomial and Gaussian distributions. The book is accompanied by a dedicated GitHub website, which contains all codes from the book in the form of ready to run Jupyter notebooks. A detailed solutions manual is also available for instructors using the textbook in their courses.
@@ -43,12 +44,8 @@ Enjoy!
 
 Vasilis Pagonis
 
-Professor of Physics Emeritus
-
-McDaniel College, USA
+Professor of Physics Emeritus, McDaniel College, USA
 
 Christopher W. Kulp
 
-Professor of Physics
-
-Lycoming College, USA
+Professor of Physics, Lycoming College, USA

@@ -42,10 +42,10 @@ We hope you will find the scripts useful and that you will enjoy running and mod
 
 Enjoy!
 
-Vasilis Pagonis
+_Vasilis Pagonis_
 
 Professor of Physics Emeritus, McDaniel College, USA
 
-Christopher W. Kulp
+_Christopher W. Kulp_
 
 Professor of Physics, Lycoming College, USA

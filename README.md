@@ -6,7 +6,7 @@ This repository contains all the Python scripts from the book:
 
 **CRC Press, 2024**
 
-**This book will be released on May 14, 2024**
+**This book was published in May 2024**
 
 _Book website at Amazon:_ 
 https://www.amazon.com/Mathematical-Methods-using-Python-Applications/dp/1032278366

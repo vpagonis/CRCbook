@@ -1,0 +1,395 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
+import pandas as pd
+
+# =============================================================================
+# DATA LOADING AND SETUP
+# =============================================================================
+
+np.random.seed(142)
+plt.rcParams["font.size"] = 16
+
+def readData():
+    """Read TL data from GitHub."""
+    url = 'https://github.com/vpagonis/Python-Codes/raw/main/Ch3PagonisGitHub/aluminaTLshort.TXT'
+    df = pd.read_table(url)
+
+    x_data = df.iloc[:, 0].to_numpy() + 273.15  # temperature in Kelvin
+    y_data = df.iloc[:, 1].to_numpy()
+
+    # Normalize
+    y_data = y_data / np.max(y_data)
+    Tmax = x_data[np.argmax(y_data)]
+
+    return x_data, y_data, Tmax
+
+# Load data
+x_data, y_data, Tmax_data = readData()
+kB = 8.617E-5
+
+# Fixed parameters
+FIXED_Imax = 1.0
+FIXED_Tmax = Tmax_data
+
+# Preliminary estimates
+LS_estimates = {'R1': 0.15, 'E1': 1.0, 'sigma': 0.01}
+LS_uncertainties = {'R1': 0.03, 'E1': 0.05, 'sigma': 0.001}
+
+FIXED_Imax1 = 1.0
+FIXED_Tmax1 = Tmax_data
+
+print("="*60)
+print("PYMC MODEL FOR SINGLE PEAK TL DATA - METROPOLIS SAMPLING")
+print("="*60)
+print("\nFixed parameters:")
+print(f"  Imax1: {FIXED_Imax1:.2f}")
+print(f"  Tmax1: {FIXED_Tmax1:.2f} K")
+
+print("\nLeast squares estimates (used for prior means):")
+print(f"  R1: {LS_estimates['R1']:.3f} ± {LS_uncertainties['R1']:.3f}")
+print(f"  E1: {LS_estimates['E1']:.3f} ± {LS_uncertainties['E1']:.3f} eV")
+print(f"  sigma: {LS_estimates['sigma']:.3f} ± {LS_uncertainties['sigma']:.3f}")
+
+# =============================================================================
+# VECTORIZED TL FUNCTION (NUMPY ONLY)
+# =============================================================================
+
+# Pre-compute constants for vectorized calculation
+T = x_data
+T2 = T**2
+Tmax = FIXED_Tmax1
+Tmax2 = Tmax**2
+eps = 1e-10
+
+# Pre-compute temperature-dependent values
+kT_eps = kB * T + eps
+kTmax_eps = kB * Tmax + eps
+
+def tl_curve_numpy(R, E):
+    """
+    NumPy-based TL calculation.
+    R and E are scalar values.
+    """
+    # Peak calculation
+    exp_arg = -E / kT_eps
+    exp_val = np.exp(exp_arg)
+
+    F = kB * T2 * exp_val * (1 - 2*kB*T/(E + eps)) / (E + eps)
+
+    exp_arg_m = -E / kTmax_eps
+    exp_val_m = np.exp(exp_arg_m)
+    Fm = kB * Tmax2 * exp_val_m * (1 - 2*kB*Tmax/(E + eps)) / (E + eps)
+
+    a = kB * Tmax2 * (1 - 1.05 * R**1.26) + eps
+    term1 = R/(1-R + eps) - np.log((1-R)/(R + eps) + eps)
+    exp_term = np.exp(E / kTmax_eps)
+
+    Z = term1 + (F * E * exp_term) / a
+    Zm = term1 + (Fm * E * exp_term) / a
+
+    Z = np.clip(Z, -500, 500)
+    Zm = np.clip(Zm, -500, 500)
+
+    argW = np.log1p(np.exp(Z))
+    argWm = np.log1p(np.exp(Zm))
+
+    denominator = argW + argW**2 + eps
+
+    result = FIXED_Imax1 * np.exp(-E/kT_eps * (Tmax - T)/Tmax) * (argWm + argWm**2) / denominator
+
+    return np.where(np.isfinite(result), np.maximum(result, 0), 0)
+
+def tl_curve_numpy_batch(params_batch):
+    """
+    Vectorized TL calculation for multiple parameter sets.
+    params_batch: array of shape (n_samples, 3) with columns [R, E, sigma]
+    Returns: array of shape (n_samples, n_temp)
+    """
+    if params_batch.ndim == 1:
+        params_batch = params_batch.reshape(1, -1)
+
+    n_samples = params_batch.shape[0]
+    result = np.zeros((n_samples, len(T)))
+
+    for i in range(n_samples):
+        result[i] = tl_curve_numpy(params_batch[i, 0], params_batch[i, 1])
+
+    return result
+
+# =============================================================================
+# SIMPLE METROPOLIS SAMPLER (NO PYMC FOR LIKELIHOOD)
+# =============================================================================
+
+# Beta parameters for R1
+mu_R1 = LS_estimates['R1']
+sigma_R1 = LS_uncertainties['R1']
+var_R1 = sigma_R1**2
+alpha_R1 = mu_R1 * (mu_R1 * (1 - mu_R1) / var_R1 - 1)
+beta_R1 = (1 - mu_R1) * (mu_R1 * (1 - mu_R1) / var_R1 - 1)
+alpha_R1 = max(alpha_R1, 1.01)
+beta_R1 = max(beta_R1, 1.01)
+
+# Prior functions
+def log_prior(R, E, sigma):
+    """Log prior probability."""
+    if R <= 0 or R >= 1 or E < 0.8 or E > 1.1 or sigma <= 0:
+        return -np.inf
+
+    logp = (stats.beta.logpdf(R, alpha_R1, beta_R1) +
+            stats.norm.logpdf(E, LS_estimates['E1'], LS_uncertainties['E1']*3) +
+            stats.halfnorm.logpdf(sigma, scale=LS_estimates['sigma']*2))
+
+    return logp
+
+def log_likelihood(R, E, sigma):
+    """Log likelihood."""
+    mu = tl_curve_numpy(R, E)
+    return np.sum(stats.norm.logpdf(y_data, mu, sigma))
+
+def log_posterior(R, E, sigma):
+    """Log posterior."""
+    lp = log_prior(R, E, sigma)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + log_likelihood(R, E, sigma)
+
+def metropolis_sampler(n_iterations=3000, n_chains=2, tune=1000):
+    """
+    Simple Metropolis sampler.
+    """
+    param_names = ['R1', 'E1', 'sigma']
+    n_params = 3
+
+    # Proposal scales
+    scales = np.array([0.02, 0.02, 0.005])
+
+    # Initialize chains
+    samples = np.zeros((n_chains, n_iterations + tune, n_params))
+    acceptance = np.zeros((n_chains, n_iterations + tune))
+
+    print("\nRunning Metropolis sampler...")
+
+    for chain in range(n_chains):
+        print(f"Evaluating chain {chain+1}")
+
+        # Initialize
+        if chain == 0:
+            current = np.array([0.5, 0.95, 0.02])
+        else:
+            current = np.array([0.3, 1.05, 0.03])
+
+        current_logp = log_posterior(current[0], current[1], current[2])
+
+        for i in range(n_iterations + tune):
+            # Store current
+            samples[chain, i] = current
+
+            # Propose new values (update all parameters at once for simplicity)
+            proposal = current + np.random.normal(0, scales)
+
+            # Check bounds
+            if (proposal[0] <= 0 or proposal[0] >= 1 or
+                proposal[1] < 0.8 or proposal[1] > 1.1 or
+                proposal[2] <= 0):
+                acceptance[chain, i] = 0
+                continue
+
+            # Compute log posterior for proposal
+            proposal_logp = log_posterior(proposal[0], proposal[1], proposal[2])
+
+            # Metropolis acceptance
+            if np.log(np.random.random()) < proposal_logp - current_logp:
+                current = proposal
+                current_logp = proposal_logp
+                acceptance[chain, i] = 1
+            else:
+                acceptance[chain, i] = 0
+
+        print(f"  Chain {chain+1} acceptance rate: {np.mean(acceptance[chain]):.3f}")
+
+    return samples, acceptance, param_names
+
+# Run sampler
+samples, acceptance, param_names = metropolis_sampler(n_iterations=3000, n_chains=2, tune=1000)
+
+# Process samples
+n_tune = 1000
+samples_after_burnin = samples[:, n_tune:, :]
+samples_flat = samples_after_burnin.reshape(-1, 3)
+
+# Calculate statistics
+means = np.mean(samples_flat, axis=0)
+stds = np.std(samples_flat, axis=0)
+hpd_lower = np.percentile(samples_flat, 2.5, axis=0)
+hpd_upper = np.percentile(samples_flat, 97.5, axis=0)
+
+# Print summary
+print("\n" + "="*80)
+print("PARAMETER SUMMARY")
+print("="*80)
+print(f"{'Parameter':<8} {'Mean':<10} {'Std':<10} {'95% HPD Lower':<15} {'95% HPD Upper':<15}")
+print("-"*60)
+for i, name in enumerate(param_names):
+    print(f"{name:<8} {means[i]:<10.4f} {stds[i]:<10.4f} {hpd_lower[i]:<15.4f} {hpd_upper[i]:<15.4f}")
+
+# =============================================================================
+# CALCULATE FIT
+# =============================================================================
+
+print("\nCalculating fit statistics...")
+n_fit = min(500, len(samples_flat))
+indices = np.random.choice(len(samples_flat), n_fit, replace=False)
+mu_samples = tl_curve_numpy_batch(samples_flat[indices])
+
+mu_mean = np.mean(mu_samples, axis=0)
+mu_hpd_lower = np.percentile(mu_samples, 2.5, axis=0)
+mu_hpd_upper = np.percentile(mu_samples, 97.5, axis=0)
+
+# Calculate R-squared
+residuals = y_data - mu_mean
+ss_res = np.sum(residuals**2)
+ss_tot = np.sum((y_data - np.mean(y_data))**2)
+r_squared = 1 - (ss_res / ss_tot)
+print(f"\nR-squared: {r_squared:.4f}")
+
+# =============================================================================
+# PLOTTING
+# =============================================================================
+
+fig, axes = plt.subplots(3, 3, figsize=(15, 12))
+
+# Plot 1: Data vs Fit
+ax = axes[0, 0]
+ax.scatter(x_data, y_data, s=5, alpha=0.5, color='blue', label='Data')
+ax.plot(x_data, mu_mean, 'r-', linewidth=2, label='Fit')
+ax.fill_between(x_data, mu_hpd_lower, mu_hpd_upper, alpha=0.3, color='red')
+ax.set_xlabel('Temperature (K)')
+ax.set_ylabel('TL Intensity')
+ax.set_title(f'(a) Data vs Fit (R² = {r_squared:.4f})')
+ax.legend(fontsize=8)
+ax.grid(True, alpha=0.3)
+
+# Plot 2: R1 Posterior
+ax = axes[0, 1]
+ax.hist(samples_flat[:, 0], bins=30, density=True, alpha=0.7,
+        color='skyblue', edgecolor='black')
+ax.axvline(means[0], color='blue', linewidth=2, label='Mean')
+ax.axvline(hpd_lower[0], color='gray', linestyle='--')
+ax.axvline(hpd_upper[0], color='gray', linestyle='--')
+ax.set_xlabel('R1')
+ax.set_ylabel('Density')
+ax.set_title('(b) R1 Posterior')
+ax.legend(fontsize=7)
+ax.grid(True, alpha=0.3)
+
+# Plot 3: E1 Posterior
+ax = axes[0, 2]
+ax.hist(samples_flat[:, 1], bins=30, density=True, alpha=0.7,
+        color='skyblue', edgecolor='black')
+ax.axvline(means[1], color='blue', linewidth=2)
+ax.axvline(hpd_lower[1], color='gray', linestyle='--')
+ax.axvline(hpd_upper[1], color='gray', linestyle='--')
+ax.set_xlabel('E1 (eV)')
+ax.set_ylabel('Density')
+ax.set_title('(c) E1 Posterior')
+ax.grid(True, alpha=0.3)
+
+# Plot 4: Sigma Posterior
+ax = axes[1, 0]
+ax.hist(samples_flat[:, 2], bins=30, density=True, alpha=0.7,
+        color='purple', edgecolor='black')
+ax.axvline(means[2], color='blue', linewidth=2)
+ax.axvline(hpd_lower[2], color='gray', linestyle='--')
+ax.axvline(hpd_upper[2], color='gray', linestyle='--')
+ax.set_xlabel('Sigma')
+ax.set_ylabel('Density')
+ax.set_title('(d) Sigma Posterior')
+ax.grid(True, alpha=0.3)
+
+# Plot 5: R1 Trace
+ax = axes[1, 1]
+for chain in range(2):
+    ax.plot(samples[chain, :, 0], alpha=0.7, linewidth=0.5, label=f'Chain {chain+1}')
+ax.axvline(1000, color='green', linestyle='--', label='Burn-in')
+ax.set_xlabel('Iteration')
+ax.set_ylabel('R1')
+ax.set_title('(e) R1 Trace')
+ax.legend(fontsize=7)
+ax.grid(True, alpha=0.3)
+
+# Plot 6: E1 Trace
+ax = axes[1, 2]
+for chain in range(2):
+    ax.plot(samples[chain, :, 1], alpha=0.7, linewidth=0.5)
+ax.axvline(1000, color='green', linestyle='--')
+ax.set_xlabel('Iteration')
+ax.set_ylabel('E1')
+ax.set_title('(f) E1 Trace')
+ax.grid(True, alpha=0.3)
+
+# Plot 7: Sigma Trace
+ax = axes[2, 0]
+for chain in range(2):
+    ax.plot(samples[chain, :, 2], alpha=0.7, linewidth=0.5)
+ax.axvline(1000, color='green', linestyle='--')
+ax.set_xlabel('Iteration')
+ax.set_ylabel('Sigma')
+ax.set_title('(g) Sigma Trace')
+ax.grid(True, alpha=0.3)
+
+# Plot 8: Autocorrelation
+ax = axes[2, 1]
+lags = 40
+for i, name in enumerate(['R1', 'E1']):
+    samples_param = samples_flat[:, i]
+    n = len(samples_param)
+    samples_centered = samples_param - np.mean(samples_param)
+    acf = np.correlate(samples_centered, samples_centered, mode='full') / np.var(samples_param)
+    acf = acf[n-1:n-1+lags] / (n - np.arange(lags))
+    ax.plot(range(lags), acf, label=name, linewidth=2)
+
+ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+ax.axhline(y=1.96/np.sqrt(len(samples_flat)), color='gray', linestyle='--', linewidth=1)
+ax.set_xlabel('Lag')
+ax.set_ylabel('Autocorrelation')
+ax.set_title('(h) Autocorrelation')
+ax.legend()
+ax.grid(True, alpha=0.3)
+
+# Plot 9: Residuals
+ax = axes[2, 2]
+ax.scatter(x_data, residuals, s=5, alpha=0.5, color='blue')
+ax.axhline(0, color='red', linewidth=1)
+ax.set_xlabel('Temperature (K)')
+ax.set_ylabel('Residuals')
+ax.set_title('(i) Residuals')
+ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+plt.show()
+
+# =============================================================================
+# FINAL SUMMARY
+# =============================================================================
+
+print("\n" + "="*60)
+print("FINAL ESTIMATES")
+print("="*60)
+for i, name in enumerate(param_names):
+    print(f"{name}: {means[i]:.4f} ± {stds[i]:.4f}  [95% HPD: {hpd_lower[i]:.4f}, {hpd_upper[i]:.4f}]")
+
+print(f"\nAcceptance rate: {np.mean(acceptance):.3f}")
+
+# Save results
+results_df = pd.DataFrame({
+    'Parameter': param_names,
+    'Mean': means,
+    'Std': stds,
+    'HDI_2.5%': hpd_lower,
+    'HDI_97.5%': hpd_upper
+})
+# results_df.to_csv('metropolis_results.csv', index=False)
+# print("\n✓ Results saved to 'metropolis_results.csv'")
+# @
+# @
